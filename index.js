@@ -6,27 +6,36 @@ let config = require(`./${soundpack}/config.json`);
 const defines = config['defines'];
 
 async function extract(key) {
-    const startTime = defines[key][0] / 1000;
-    const endTime = defines[key][1] / 1000;
-    console.log(startTime, endTime);
-    const extenstion = config['sound'].split('.')[1];
-    const extraction = await execa('ffmpeg', [
-        '-ss', startTime,
-        '-i', join(process.cwd(), soundpack, config['sound']),
-        '-t', endTime,
-        '-c', 'copy',
-        join(process.cwd(), soundpack, `${key}.${extenstion}`)
-    ]);
-}
+    if (defines[key]) {
+        const startTime = defines[key][0] / 1000;
+        const duration = defines[key][1] / 1000;
+        console.log(`Extracting ${key}: start=${startTime}s, duration=${duration}s`);
+        const outputExt = 'mp3';
+        const outputPath = join(process.cwd(), soundpack, `${key}.${outputExt}`);
+        try {
+            await execa('ffmpeg', [
+                '-y', // Overwrite output files without asking
+                '-ss', startTime.toString(),
+                '-i', join(process.cwd(), soundpack, config['sound']),
+                '-t', duration.toString(),
+                '-vn', // No video
+                '-acodec', 'libmp3lame',
+                outputPath
+            ]);
+        } catch (err) {
+            console.error(`Error extracting ${key}:`, err);
+        }
+        }
+    }
 
-const extenstion = config['sound'].split('.')[1];
-
-for (const key in defines) {
-    extract(key);
-    config['defines'][key] = `${key}.${extenstion}`;
-}
-
-config['key_define_type'] = 'multiple';
-let data = JSON.stringify(config);
-fs.writeFileSync(join(process.cwd(), soundpack, 'config.json'), data);
-console.log(config);
+    (async () => {
+    const outputExt = 'mp3';
+    for (const key in defines) {
+        await extract(key);
+        config['defines'][key] = `${key}.${outputExt}`;
+    }
+    config['key_define_type'] = 'multiple';
+    let data = JSON.stringify(config, null, 4);
+    fs.writeFileSync(join(process.cwd(), soundpack, 'config.json'), data);
+    console.log(config);
+})();
